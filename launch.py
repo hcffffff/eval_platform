@@ -77,7 +77,7 @@ def setInteractiveForSingleEval(uid):
             已登录为 {uid}
         '''), gr.update(visible=False), gr.update(visible=False), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True)
     else:
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
 def setInteractiveForMultiEval(uid):
     '''
@@ -100,32 +100,6 @@ def changeModelListForMultiEval(model_choose):
     '''
     model_list = getModelLabel()
     return gr.update(choices=model_list) ## TODO 待模型API可用后修改回来
-    if model_choose == None or model_choose not in model_list:
-        return gr.update(choices=model_list)
-    else:
-        model_list.remove(model_choose)
-        return gr.update(choices=model_list)
-
-def changeSubmitButtonForMultiEval(human_option, output_1, output_2):
-    '''
-    防止两模型人工对比时提交空评价，等待两个模型的output都有结果再进行提交
-    '''
-    if human_option != None and output_1 != "" and output_2 != "":
-        return gr.update(interactive=True)
-    else:
-        return gr.update()
-
-def changeKnowledgeNode(subject):
-    '''
-    根据学科选择知识点多选框更新
-    '''
-    return gr.update(choices=getKnowledgeNode(subject), interactive=True)
-
-def changeModelListForMultiEval(model_choose):
-    '''
-    防止两模型人工对比时选择了两个一样的模型
-    '''
-    model_list = getModelLabel()
     if model_choose == None or model_choose not in model_list:
         return gr.update(choices=model_list)
     else:
@@ -342,7 +316,6 @@ def main():
                     submit_button
                 ]
             )
-            human_option.change(changeSubmitButtonForMultiEval, inputs=[human_option, output_model_1, output_model_2], outputs=submit_button)
     demo.launch()
 
 if __name__ == "__main__":
