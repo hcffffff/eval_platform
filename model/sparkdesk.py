@@ -139,4 +139,4 @@ if __name__ == "__main__":
          api_secret="",
          api_key="",
          gpt_url="ws://spark-api.xf-yun.com/v1.1/chat",
-         question="鲁迅和周树人是同一个人吗？")
+         question="你是谁？")

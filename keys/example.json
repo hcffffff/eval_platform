@@ -1,0 +1,18 @@
+{
+    "ChatGPT": [
+        "sk-xxx", 
+        "sk-xxx"
+    ], 
+    "sparkDesk": [
+        {
+            "appid": "xx",
+            "api_secret": "xx", 
+            "api_key": "xx"
+        }, 
+        {
+            "appid": "xx",
+            "api_secret": "xx", 
+            "api_key": "xx"
+        }
+    ]
+}
