@@ -17,5 +17,5 @@ class ChatGPT:
         return chat.get("choices")[0]["message"]["content"]
 
 if __name__ == "__main__":
-    cg = ChatGPT('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')
+    cg = ChatGPT('')
     print(cg.chat("你好"))
