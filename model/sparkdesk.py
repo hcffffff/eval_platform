@@ -66,8 +66,6 @@ def on_close(ws, status_code, reason):
     print("")
 
 
-
-
 # 收到websocket连接建立的处理
 def on_open(ws):
     thread.start_new_thread(run, (ws,))
@@ -122,6 +120,19 @@ def gen_params(appid, question):
     }
     return data
 
+class SparkDesk(object):
+    def __init__(self, appid, api_key, api_secret):
+        self.wsParam = Ws_Param(appid, api_key, api_secret, gpt_url="ws://spark-api.xf-yun.com/v1.1/chat")
+        self.websocket = websocket
+        self.websocket.enableTrace(False)
+        self.wsUrl = self.wsParam.create_url()
+        self.ws = self.websocket.WebSocketApp(self.wsUrl, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open)
+        self.ws.appid = appid
+    
+    def chat(self, question):
+        self.ws.question = question
+        self.ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        
 
 def main(appid, api_key, api_secret, gpt_url, question):
     wsParam = Ws_Param(appid, api_key, api_secret, gpt_url)

@@ -1,5 +1,6 @@
 import gradio as gr
 from utils import *
+from model.model import Model
 
 '''
 这是构成前端交互页面的组件文件
@@ -18,8 +19,8 @@ scripts = '''
 
 这里说明该系统的使用方法
 '''
-
-def singleModelEval(model, question, question_type, knowledge_node, knowledge_level, answer, reason):
+apikey = {}
+def singleModelEval(model, question, question_type, subject, knowledge_node, knowledge_level, answer, reason, user):
     '''
     核心素养测评Gradio函数，需要配置模型到这里
     input:
@@ -28,10 +29,12 @@ def singleModelEval(model, question, question_type, knowledge_node, knowledge_le
     output:
         模型1回答, 模型2回答
     '''
-    print(model, question, question_type, knowledge_node, knowledge_level, answer, reason)
-    return "准确度", "鲁棒性", "可解释性"
+    Md = Model(apikey)
+    response = Md.chat(model, question)
+    saveSingleEval(question, answer, reason, question_type, subject, knowledge_node, knowledge_level, model, response, user)
+    return response, "准确度", "鲁棒性自动测评TODO", "可解释性自动测评TODO"
 
-def multiModelEval(model_1, model_2, question, question_type, knowledge_node, knowledge_level, answer, reason):
+def multiModelEval(model_1, model_2, question, question_type, subject, knowledge_node, knowledge_level, answer, reason, user):
     '''
     核心素养测评Gradio函数，需要配置模型到这里
     input:
@@ -47,6 +50,8 @@ def verifyUser(uid):
     '''
     初步的用户登录验证
     '''
+    global apikey
+    apikey = getAPIKey()
     return True
     if uid=='chaofan': # TODO 修改为验证测评人身份的判断条件
         return True
@@ -66,7 +71,6 @@ def setInteractiveForSingleEval(uid):
     else:
         return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
-
 def setInteractiveForMultiEval(uid):
     '''
     通过用户验证后将登录框设置为不可见，并将两模型人工对比中的交互文本框和各种按钮设置为可交互
@@ -75,7 +79,6 @@ def setInteractiveForMultiEval(uid):
         return gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True)
     else:
         return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
-
 
 def changeKnowledgeNode(subject):
     '''
@@ -152,6 +155,7 @@ def main():
             可解释性：选用现成的文本相似度计算的库
             output：单道题测试直接输出正误、是否鲁棒、相似度分数/多道题测试算平均（取决于是否实现批量输入）
             """
+            output_model = gr.Textbox(label="模型回答", interactive=False)
             with gr.Row():
                 metric_correct = gr.Textbox(label="准确度", interactive=False)
                 metric_robust = gr.Textbox(label="鲁棒性", interactive=False)
@@ -185,12 +189,15 @@ def main():
                     input_model, 
                     input_question, 
                     input_type, 
+                    input_subject, 
                     input_knowledge_node, 
                     input_knowledge_level, 
                     input_answer, 
-                    input_reason
+                    input_reason, 
+                    input_user_info
                 ],
                 outputs=[
+                    output_model, 
                     metric_correct,
                     metric_robust,
                     metric_explain
@@ -257,11 +264,13 @@ def main():
                     input_model_1, 
                     input_model_2, 
                     input_question, 
-                    input_type,
+                    input_type, 
+                    input_subject, 
                     input_knowledge_node, 
                     input_knowledge_level, 
                     input_answer, 
-                    input_reason
+                    input_reason, 
+                    input_user_info
                 ],
                 outputs=[
                     output_model_1,
