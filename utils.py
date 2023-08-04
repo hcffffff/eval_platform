@@ -59,14 +59,14 @@ def saveSingleEval(question, answer, reason, question_type, subject, knowledge_n
         "update_time": now
     }
     subject = subjects_en[subject]
-    if not os.path.exists(f'data/single_eval/{subject}'):
-        os.mkdir(f'data/single_eval/{subject}')
-    if not os.path.exists(f'data/question_collect/{subject}'):
-        os.mkdir(f'data/question_collect/{subject}')
-    with open(f'data/single_eval/{subject}/{eval_id}.json', 'w', encoding='utf-8') as evalF:
+    if not os.path.exists(os.path.join(os.getcwd(), 'data', 'single_eval', subject, knowledge_node)):
+        os.mkdir(os.path.join(os.getcwd(), 'data', 'single_eval', subject, knowledge_node))
+    if not os.path.exists(os.path.join(os.getcwd(), 'data', 'question_collect', subject, knowledge_node)):
+        os.mkdir(os.path.join(os.getcwd(), 'data', 'question_collect', subject, knowledge_node))
+    with open(os.path.join(os.getcwd(), 'data', 'single_eval', subject, knowledge_node, eval_id, '.json'), 'w', encoding='utf-8') as evalF:
         json.dump(evalDict, evalF, ensure_ascii=False, indent=4)
     evalF.close()
-    with open(f'data/question_collect/{subject}/{question_id}.json', 'w', encoding='utf-8') as questionF:
+    with open(os.path.join(os.getcwd(), 'data', 'question_collect', subject, knowledge_node, question_id, '.json'), 'w', encoding='utf-8') as questionF:
         json.dump(questionDict, questionF, ensure_ascii=False, indent=4)
     questionF.close()
     return gr.update(interactive=False)
@@ -102,14 +102,14 @@ def saveMultiEval(question, answer, reason, question_type, subject, knowledge_no
         "update_time": now
     }
     subject = subjects_en[subject]
-    if not os.path.exists(f'data/multi_eval/{subject}'):
-        os.mkdir(f'data/multi_eval/{subject}')
-    if not os.path.exists(f'data/question_collect/{subject}'):
-        os.mkdir(f'data/question_collect/{subject}')
-    with open(f'data/multi_eval/{subject}/{eval_id}.json', 'w', encoding='utf-8') as evalF:
+    if not os.path.exists(os.path.join(os.getcwd(), 'data', 'multi_eval', subject, knowledge_node)):
+        os.mkdir(os.path.join(os.getcwd(), 'data', 'multi_eval', subject, knowledge_node))
+    if not os.path.exists(os.path.join(os.getcwd(), 'data', 'question_collect', subject, knowledge_node)):
+        os.mkdir(os.path.join(os.getcwd(), 'data', 'question_collect', subject, knowledge_node))
+    with open(os.path.join(os.getcwd(), 'data', 'multi_eval', subject, knowledge_node, eval_id, '.json'), 'w', encoding='utf-8') as evalF:
         json.dump(evalDict, evalF, ensure_ascii=False, indent=4)
     evalF.close()
-    with open(f'data/question_collect/{subject}/{question_id}.json', 'w', encoding='utf-8') as questionF:
+    with open(os.path.join(os.getcwd(), 'data', 'question_collect', subject, knowledge_node, question_id, '.json'), 'w', encoding='utf-8') as questionF:
         json.dump(questionDict, questionF, ensure_ascii=False, indent=4)
     questionF.close()
     return gr.update(interactive=False)
