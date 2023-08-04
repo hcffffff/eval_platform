@@ -1,153 +1,236 @@
-import _thread as thread
 import base64
-import datetime
-import hashlib
 import hmac
 import json
-from urllib.parse import urlparse
-import ssl
-from datetime import datetime
-from time import mktime
-from urllib.parse import urlencode
-from wsgiref.handlers import format_date_time
-# websocket-client
-import websocket
+from datetime import datetime, timezone
+from urllib.parse import urlencode, urlparse
+from websocket import create_connection, WebSocketConnectionClosedException
 
-class Ws_Param(object):
-    # 初始化
-    def __init__(self, APPID, APIKey, APISecret, gpt_url):
-        self.APPID = APPID
-        self.APIKey = APIKey
-        self.APISecret = APISecret
-        self.host = urlparse(gpt_url).netloc
-        self.path = urlparse(gpt_url).path
-        self.gpt_url = gpt_url
+'''
+该代码参考 https://github.com/HildaM/sparkdesk-api
+'''
 
-    # 生成url
-    def create_url(self):
-        # 生成RFC1123格式的时间戳
-        now = datetime.now()
-        date = format_date_time(mktime(now.timetuple()))
+def get_prompt(query: str, history: list):
+    use_message = {"role": "user", "content": query}
+    if history is None:
+        history = []
+    history.append(use_message)
+    message = {"text": history}
+    return message
 
-        # 拼接字符串
-        signature_origin = "host: " + self.host + "\n"
-        signature_origin += "date: " + date + "\n"
-        signature_origin += "GET " + self.path + " HTTP/1.1"
+def process_response(response_str: str, history: list):
+    res_dict: dict = json.loads(response_str)
+    code = res_dict.get("header", {}).get("code")
+    status = res_dict.get("header", {}).get("status", 2)
 
-        # 进行hmac-sha256进行加密
-        signature_sha = hmac.new(self.APISecret.encode('utf-8'), signature_origin.encode('utf-8'),
-                                 digestmod=hashlib.sha256).digest()
+    if code == 0:
+        res_dict = res_dict.get("payload", {}).get("choices", {}).get("text", [{}])[0]
+        res_content = res_dict.get("content", "")
 
-        signature_sha_base64 = base64.b64encode(signature_sha).decode(encoding='utf-8')
+        if len(res_dict) > 0 and len(res_content) > 0:
+            # Ignore the unnecessary data
+            if "index" in res_dict:
+                del res_dict["index"]
+            response = res_content
 
-        authorization_origin = f'api_key="{self.APIKey}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature_sha_base64}"'
+            if status == 0:
+                history.append(res_dict)
+            else:
+                history[-1]["content"] += response
+                response = history[-1]["content"]
 
-        authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode(encoding='utf-8')
+            return response, history, status
+        else:
+            return "", history, status
+    else:
+        print("error code ", code)
+        print("you can see this website to know code detail")
+        print("https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html")
+        return "", history, status
 
-        # 将请求的鉴权参数组合为字典
-        v = {
+
+class SparkAPI:
+    __api_url = 'wss://spark-api.xf-yun.com/v1.1/chat'
+    __max_token = 2048
+
+    def __init__(self, app_id, api_key, api_secret):
+        self.__app_id = app_id
+        self.__api_key= api_key
+        self.__api_secret = api_secret
+
+    def __set_max_tokens(self, token):
+        if isinstance(token, int) is False or token < 0:
+            print("set_max_tokens() error: tokens should be a positive integer!")
+            return
+        self.__max_token = token
+
+    """
+    doc url: https://www.xfyun.cn/doc/spark/general_url_authentication.html
+    """
+
+    def __get_authorization_url(self):
+        authorize_url = urlparse(self.__api_url)
+        # 1. generate data
+        date = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S %Z')
+
+        """
+        Generation rule of Authorization parameters
+            1) Obtain the APIKey and APISecret parameters from the console.
+            2) Use the aforementioned date to dynamically concatenate a string tmp. Here we take Huobi's URL as an example, 
+                the actual usage requires replacing the host and path with the specific request URL.
+        """
+        signature_origin = "host: {}\ndate: {}\nGET {} HTTP/1.1".format(
+            authorize_url.netloc, date, authorize_url.path
+        )
+        signature = base64.b64encode(
+            hmac.new(
+                self.__api_secret.encode(),
+                signature_origin.encode(),
+                digestmod='sha256'
+            ).digest()
+        ).decode()
+        authorization_origin = \
+            'api_key="{}",algorithm="{}",headers="{}",signature="{}"'.format(
+                self.__api_key, "hmac-sha256", "host date request-line", signature
+            )
+        authorization = base64.b64encode(authorization_origin.encode()).decode()
+        params = {
             "authorization": authorization,
             "date": date,
-            "host": self.host
+            "host": authorize_url.netloc
         }
-        # 拼接鉴权参数，生成url
-        url = self.gpt_url + '?' + urlencode(v)
-        # 此处打印出建立连接时候的url,参考本demo的时候可取消上方打印的注释，比对相同参数时生成的url与自己代码生成的url是否一致
-        return url
 
+        ws_url = self.__api_url + "?" + urlencode(params)
+        return ws_url
 
-# 收到websocket错误的处理
-def on_error(ws, error):
-    print("### error:", error)
+    def __build_inputs(
+            self,
+            message: dict,
+            user_id: str = "001",
+            domain: str = "general",
+            temperature: float = 0.5,
+            max_tokens: int = 2048
+    ):
+        input_dict = {
+            "header": {
+                "app_id": self.__app_id,
+                "uid": user_id,
+            },
+            "parameter": {
+                "chat": {
+                    "domain": domain,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+            },
+            "payload": {
+                "message": message
+            }
+        }
+        return json.dumps(input_dict)
 
+    def chat(
+            self,
+            query: str,
+            history: list = None,  # store the conversation history
+            user_id: str = "001",
+            domain: str = "general",
+            max_tokens: int = 2048,
+            temperature: float = 0.5,
+    ):
+        if history is None:
+            history = []
 
-# 收到websocket关闭的处理
-def on_close(ws, status_code, reason):
-    print("")
+        # the max of max_length is 4096
+        max_tokens = min(max_tokens, 4096)
+        url = self.__get_authorization_url()
+        ws = create_connection(url)
+        message = get_prompt(query, history)
+        input_str = self.__build_inputs(
+            message=message,
+            user_id=user_id,
+            domain=domain,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        ws.send(input_str)
+        response_str = ws.recv()
+        try:
+            while True:
+                response, history, status = process_response(response_str, history)
+                """
+                The final return result, which means a complete conversation.
+                doc url: https://www.xfyun.cn/doc/spark/Web.html#_1-%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E
+                """
+                if len(response) == 0 or status == 2:
+                    break
+                response_str = ws.recv()
+            return response
 
-
-# 收到websocket连接建立的处理
-def on_open(ws):
-    thread.start_new_thread(run, (ws,))
-
-
-def run(ws, *args):
-    data = json.dumps(gen_params(appid=ws.appid, question=ws.question))
-    ws.send(data)
-
-
-# 收到websocket消息的处理
-def on_message(ws, message):
-    # print(message)
-    data = json.loads(message)
-    code = data['header']['code']
-    if code != 0:
-        print(f'请求错误: {code}, {data}')
-        ws.close()
-    else:
-        choices = data["payload"]["choices"]
-        status = choices["status"]
-        content = choices["text"][0]["content"]
-        print(content, end='')
-        if status == 2:
+        except WebSocketConnectionClosedException:
+            print("Connection closed")
+        finally:
             ws.close()
 
+    # Stream output statement, used for terminal chat.
+    def __streaming_output(
+            self,
+            query: str,
+            history: list = None,  # store the conversation history
+            user_id: str = "001",
+            domain: str = "general",
+            max_tokens: int = 2048,
+            temperature: float = 0.5,
+    ):
+        if history is None:
+            history = []
 
-def gen_params(appid, question):
-    """
-    通过appid和用户的提问来生成请参数
-    """
-    data = {
-        "header": {
-            "app_id": appid,
-            "uid": "1234"
-        },
-        "parameter": {
-            "chat": {
-                "domain": "general",
-                "random_threshold": 0.5,
-                "max_tokens": 2048,
-                "auditing": "default"
-            }
-        },
-        "payload": {
-            "message": {
-                "text": [
-                    {"role": "user", "content": question}
-                ]
-            }
-        }
-    }
-    return data
+        # the max of max_length is 4096
+        max_tokens = min(max_tokens, 4096)
+        url = self.__get_authorization_url()
+        ws = create_connection(url)
 
-class SparkDesk(object):
-    def __init__(self, appid, api_key, api_secret):
-        self.wsParam = Ws_Param(appid, api_key, api_secret, gpt_url="ws://spark-api.xf-yun.com/v1.1/chat")
-        self.websocket = websocket
-        self.websocket.enableTrace(False)
-        self.wsUrl = self.wsParam.create_url()
-        self.ws = self.websocket.WebSocketApp(self.wsUrl, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open)
-        self.ws.appid = appid
-    
-    def chat(self, question):
-        self.ws.question = question
-        self.ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
-        
+        message = get_prompt(query, history)
+        input_str = self.__build_inputs(
+            message=message,
+            user_id=user_id,
+            domain=domain,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
 
-def main(appid, api_key, api_secret, gpt_url, question):
-    wsParam = Ws_Param(appid, api_key, api_secret, gpt_url)
-    websocket.enableTrace(False)
-    wsUrl = wsParam.create_url()
-    ws = websocket.WebSocketApp(wsUrl, on_message=on_message, on_error=on_error, on_close=on_close, on_open=on_open)
-    ws.appid = appid
-    ws.question = question
-    ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        # send question or prompt to url, and receive the answer
+        ws.send(input_str)
+        response_str = ws.recv()
+
+        # Continuous conversation
+        try:
+            while True:
+                response, history, status = process_response(response_str, history)
+                yield response, history
+                if len(response) == 0 or status == 2:
+                    break
+                response_str = ws.recv()
+
+        except WebSocketConnectionClosedException:
+            print("Connection closed")
+        finally:
+            ws.close()
+
+    def chat_stream(self):
+        history = []
+        print("Enter exit or stop to end the converation.\n")
+        try:
+            while True:
+                query = input("Ask: ")
+                if query == "exit" or query == "stop":
+                    break
+                for response, _ in self.__streaming_output(query, history):
+                    print("\r" + response, end="")
+                print("\n")
+        finally:
+            print("\nThank you for using the SparkDesk AI. Welcome to use it again!")
 
 
 if __name__ == "__main__":
-    # 测试时候在此处正确填写相关信息即可运行
-    main(appid="",
-         api_secret="",
-         api_key="",
-         gpt_url="ws://spark-api.xf-yun.com/v1.1/chat",
-         question="你是谁？")
+    sd = SparkAPI("a303d825", "0340f6686a6b5f494e308074b4313c8f", "OTE4MmYzZjY2YWRkOTE3ZjM3MjdmNDU3")
+    print(sd.chat(query="你好？"))

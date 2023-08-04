@@ -99,7 +99,6 @@ def changeModelListForMultiEval(model_choose):
     防止两模型人工对比时选择了两个一样的模型
     '''
     model_list = getModelLabel()
-    return gr.update(choices=model_list) ## TODO 待模型API可用后修改回来
     if model_choose == None or model_choose not in model_list:
         return gr.update(choices=model_list)
     else:

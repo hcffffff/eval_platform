@@ -6,13 +6,15 @@ class ChatGPT(object):
         self.openai = openai
         self.openai.api_key = api_key
     
-    def chat(self, question, role=""):
+    def chat(self, query, temperature=0, max_tokens=4096, role=""):
         chat = self.openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": role},
-                        {"role": "user", "content": question}
-                    ]
+                        {"role": "user", "content": query}
+                    ], 
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
         return chat.get("choices")[0]["message"]["content"]
 
