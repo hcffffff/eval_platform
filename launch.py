@@ -19,6 +19,7 @@ scripts = '''
 
 这里说明该系统的使用方法
 '''
+
 apikey = {}
 def singleModelEval(model, question, answer, reason):
     '''
@@ -34,7 +35,7 @@ def singleModelEval(model, question, answer, reason):
         robustness: float 鲁棒性
         Interpretability: float 可解释性
     '''
-    if model == ' ' or model == None:
+    if model == '' or model == None:
         gr.Warning("请选择模型")
         return '', '', '', ''
     if question == '' or answer == '' or reason == '':
@@ -44,17 +45,25 @@ def singleModelEval(model, question, answer, reason):
     response = Md.chat(model, question)
     return response, check_choice(answer, reason, response), "鲁棒性自动测评TODO", "可解释性自动测评TODO"
 
-def multiModelEval(model_1, model_2, question):
+def multiModelEval(model_1, model_2, question, answer, reason):
     '''
     多模型对比测评
     input:
         model_1: str 模型1
         model_2: str 模型2
-        question 问题
+        question: str 问题
+        answer: str 标准答案
+        reason: str 答案解析
     output:
         model_1_response: str 模型1回答
         model_2_response: str 模型2回答
     '''
+    if model_1 == '' or model_1 == None or model_2 == '' or model_2 == None:
+        gr.Warning("请选择模型")
+        return '', ''
+    if question == '' or answer == '' or reason == '':
+        gr.Warning("请完善问题，答案，以及答案解析")
+        return '', ''
     Md = Model(apikey)
     model_1_response = Md.chat(model_1, question)
     model_2_response = Md.chat(model_2, question)
@@ -157,20 +166,10 @@ def main():
                 input_knowledge_level = gr.Dropdown(["初级", "中级", "高级"], label="知识点分级", interactive=False)
                 input_type = gr.Dropdown(["选择题", "填空题", "解答题"], label="题目类型", interactive=False)
             input_question = gr.Textbox(label="题目", interactive=False)
-            # 根据具体需求确定是否需要该选项
-            # 这里知识点和核心素养分级起到的作用可能得问申老师,包括这里是”知识点多选+分级单选 如 有理数*二次根式+初级“ 还是 ”知识点+分级多选 如 有理数初级+二次根式中级“
-            # 知识点待补全
             input_answer = gr.Textbox(label="答案", info="请给出最终答案", interactive=False)
             input_reason = gr.Textbox(label="答案解析", info="请给出完整解析", interactive=False)
-            """
-            应能提取出模型输出的最终答案和答案解析，并于输入进行对比
-            input：（标准答案，模型答案）/三次模型答案/（标准解析，模型解析）
-            准确度：字符串比较
-            鲁棒性：让模型回答同样的问题三次观察答案是否相同，借助字典
-            可解释性：选用现成的文本相似度计算的库
-            output：单道题测试直接输出正误、是否鲁棒、相似度分数/多道题测试算平均（取决于是否实现批量输入）
-            """
-            all_must_input = [input_model, input_subject, input_knowledge_node, input_knowledge_level, input_type, input_answer, input_reason]
+
+            all_must_input = [input_model, input_subject, input_knowledge_node, input_knowledge_level, input_type, input_question, input_answer, input_reason]
             output_response = gr.Textbox(label="模型回答", interactive=False)
             with gr.Row():
                 metric_correct = gr.Textbox(label="准确度", interactive=False)
@@ -186,7 +185,7 @@ def main():
                 inputs=clear_button, 
                 outputs=upload_button
             )
-            # 设置验证用户通过后可以进行交互
+            # check_button 身份验证按钮，点击后验证身份并开启交互按钮
             check_button.click(
                 setInteractiveForSingleEval,
                 inputs=[
@@ -207,7 +206,7 @@ def main():
                     do_button
                 ]
             )
-            # 测评按钮，点击后开始测评 TODO 设置如果没有完全输入则无法测评
+            # do_button 测评按钮，点击后开始测评，如果没有完全输入则无法测评
             do_button.click(
                 singleModelEval,
                 inputs=[
@@ -223,11 +222,13 @@ def main():
                     metric_explain
                 ]
             )
+            # output_response 测评结束后才可以点击上传按钮进行结果和题目的上传
             output_response.change(
                 lambda w: gr.update(interactive=True) if w != None else gr.update(),
                 inputs=output_response,
                 outputs=upload_button
-            ) # 测评结束后才可以点击上传按钮进行结果和题目的上传
+            )
+            # upload_button 上传按钮，点击后上传测评和结果，并且避免二次上传
             upload_button.click(
                 saveSingleEval, 
                 inputs=[
@@ -245,7 +246,7 @@ def main():
                 outputs=[
                     upload_button
                 ]
-            ) # 上传按钮，点击后上传测评和结果，并且避免二次上传
+            )
         with gr.Tab("两模型人工对比"):
             gr.Markdown(
                 '''
@@ -267,21 +268,26 @@ def main():
             input_question = gr.Textbox(label="题目", interactive=False)
             input_answer = gr.Textbox(label="答案", info="请给出最终答案", interactive=False)
             input_reason = gr.Textbox(label="答案解析", info="请给出完整解析", interactive=False)
-
+            all_must_input = [input_model_1, input_model_2, input_subject, input_knowledge_node, input_knowledge_level, input_type, input_question, input_answer, input_reason]
             with gr.Row():
                 output_response_1 = gr.Textbox(label="模型 1 回答", interactive=False)
                 output_response_2 = gr.Textbox(label="模型 2 回答", interactive=False)
+                all_output = [output_response_1, output_response_2]
             with gr.Row():
                 do_button = gr.Button("模型对比测评", interactive=False)
                 input_model_1.change(changeModelListForMultiEval, inputs=input_model_1, outputs=[input_model_2, do_button])
                 input_model_2.change(changeModelListForMultiEval, inputs=input_model_2, outputs=[input_model_1, do_button])
             with gr.Row():
                 user_opinion = gr.Radio(["模型1更好", "模型2更好", "平手","都很差"], label="请给出你的评价", interactive=False)
-                submit_button = gr.Button("提交", interactive=False)
+                upload_button = gr.Button("提交", interactive=False)
             with gr.Row():
-                clear_button = gr.ClearButton(
-                    [input_model_1, input_model_2, input_question, input_subject, input_type, input_knowledge_node, input_knowledge_level, input_answer, 
-                    input_reason, output_response_1, output_response_2, user_opinion], interactive=False)
+                clear_button = gr.ClearButton(all_must_input+all_output+[user_opinion], interactive=False)
+                clear_button.click(
+                    lambda w: gr.update(interactive=False), 
+                    inputs=clear_button, 
+                    outputs=upload_button
+                )
+            # check_button 身份验证按钮，点击后验证身份并开启交互按钮
             check_button.click(
                 setInteractiveForMultiEval,
                 inputs=[
@@ -297,23 +303,33 @@ def main():
                     input_subject, 
                     input_knowledge_level, 
                     input_answer, 
-                    input_reason
+                    input_reason, 
+                    do_button
                 ]
             )
+            # do_button 测评按钮，点击后开始测评，如果没有完全输入则无法测评
             do_button.click(
                 multiModelEval,
                 inputs=[
                     input_model_1, 
                     input_model_2, 
-                    input_question
+                    input_question, 
+                    input_answer, 
+                    input_reason
                 ],
                 outputs=[
                     output_response_1,
                     output_response_2
                 ]
             )
-            user_opinion.change(changeSubmitButtonForMultiEval, inputs=[user_opinion, output_response_1, output_response_2], outputs=submit_button)
-            submit_button.click(
+            # user_opinion 测评结束后才可以点击上传按钮进行结果和题目的上传
+            user_opinion.change(
+                changeSubmitButtonForMultiEval, 
+                inputs=[user_opinion, output_response_1, output_response_2], 
+                outputs=upload_button
+            )
+            # upload_button 点击后上传测评结果和数据，并避免二次上传
+            upload_button.click(
                 saveMultiEval, 
                 inputs=[
                     input_question, 
@@ -331,7 +347,7 @@ def main():
                     user_opinion
                 ], 
                 outputs=[
-                    submit_button
+                    upload_button
                 ]
             )
     demo.launch()

@@ -3,7 +3,7 @@
         "sk-xxx", 
         "sk-xxx"
     ], 
-    "sparkDesk": [
+    "SparkDesk": [
         {
             "appid": "xx",
             "api_secret": "xx", 
@@ -13,6 +13,12 @@
             "appid": "xx",
             "api_secret": "xx", 
             "api_key": "xx"
+        }
+    ], 
+    "ErnieBot": [
+        {
+            "api_key": "xx", 
+            "secret_key": "xx"
         }
     ]
 }
