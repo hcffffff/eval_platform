@@ -24,7 +24,7 @@ class Model(object):
         elif model == 'SparkDesk':
             self.SparkDeskKey = random.choice(self.keys["sparkDesk"])
             self.SparkDesk = SparkAPI(self.SparkDeskKey["appid"], self.SparkDeskKey["api_key"], self.SparkDeskKey["api_secret"])
-            return self.SparkDesk.chat(query=question, temperature=temperature, max_tokens=max_tokens-74)
+            return self.SparkDesk.chat(query=question, temperature=temperature, max_tokens=max_tokens)
         else:
             return ""
 

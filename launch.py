@@ -34,6 +34,12 @@ def singleModelEval(model, question, answer, reason):
         robustness: float 鲁棒性
         Interpretability: float 可解释性
     '''
+    if model == ' ' or model == None:
+        gr.Warning("请选择模型")
+        return '', '', '', ''
+    if question == '' or answer == '' or reason == '':
+        gr.Warning("请完善问题，答案，以及答案解析")
+        return '', '', '', ''
     Md = Model(apikey)
     response = Md.chat(model, question)
     return response, check_choice(answer, reason, response), "鲁棒性自动测评TODO", "可解释性自动测评TODO"
@@ -75,18 +81,18 @@ def setInteractiveForSingleEval(uid):
             ## 登录
 
             已登录为 {uid}
-        '''), gr.update(visible=False), gr.update(visible=False), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True)
+        '''), gr.update(visible=False), gr.update(visible=False), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True)
     else:
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
 def setInteractiveForMultiEval(uid):
     '''
     通过用户验证后将登录框设置为不可见，并将两模型人工对比中的交互文本框和各种按钮设置为可交互
     '''
     if verifyUser(uid):
-        return gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True)
+        return gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True)
     else:
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
 def changeKnowledgeNode(subject):
     '''
@@ -96,14 +102,14 @@ def changeKnowledgeNode(subject):
 
 def changeModelListForMultiEval(model_choose):
     '''
-    防止两模型人工对比时选择了两个一样的模型
+    防止两模型人工对比时选择了两个一样的模型，并且保证只有选择了两个模型才能进行测试
     '''
     model_list = getModelLabel()
     if model_choose == None or model_choose not in model_list:
-        return gr.update(choices=model_list)
+        return gr.update(choices=model_list), gr.update()
     else:
         model_list.remove(model_choose)
-        return gr.update(choices=model_list)
+        return gr.update(choices=model_list), gr.update(interactive=True)
 
 def changeSubmitButtonForMultiEval(human_option, output_1, output_2):
     '''
@@ -116,6 +122,7 @@ def changeSubmitButtonForMultiEval(human_option, output_1, output_2):
 
 def main():
     with gr.Blocks() as demo:
+        demo.queue()
         gr.Markdown('''
             # 教育大模型测试系统
             
@@ -163,15 +170,23 @@ def main():
             可解释性：选用现成的文本相似度计算的库
             output：单道题测试直接输出正误、是否鲁棒、相似度分数/多道题测试算平均（取决于是否实现批量输入）
             """
+            all_must_input = [input_model, input_subject, input_knowledge_node, input_knowledge_level, input_type, input_answer, input_reason]
             output_response = gr.Textbox(label="模型回答", interactive=False)
             with gr.Row():
                 metric_correct = gr.Textbox(label="准确度", interactive=False)
                 metric_robust = gr.Textbox(label="鲁棒性", interactive=False)
                 metric_explain = gr.Textbox(label="可解释性", interactive=False)
+                all_output = [output_response, metric_correct, metric_robust, metric_explain]
             with gr.Row():
                 do_button = gr.Button("测评", interactive=False)
-                clear_button = gr.ClearButton([input_model, input_question, input_subject, input_type, input_knowledge_node, input_knowledge_level, input_reason, input_answer, metric_correct, metric_robust, metric_explain], interactive=False)
+                clear_button = gr.ClearButton(all_must_input+all_output, interactive=False)
             upload_button = gr.Button("上传", interactive=False)
+            clear_button.click(
+                lambda w: gr.update(interactive=False), 
+                inputs=clear_button, 
+                outputs=upload_button
+            )
+            # 设置验证用户通过后可以进行交互
             check_button.click(
                 setInteractiveForSingleEval,
                 inputs=[
@@ -181,7 +196,6 @@ def main():
                     login_md, 
                     input_user_info, 
                     check_button, 
-                    do_button, 
                     clear_button, 
                     input_model, 
                     input_subject, 
@@ -190,9 +204,10 @@ def main():
                     input_knowledge_level, 
                     input_answer, 
                     input_reason, 
-                    upload_button
+                    do_button
                 ]
             )
+            # 测评按钮，点击后开始测评 TODO 设置如果没有完全输入则无法测评
             do_button.click(
                 singleModelEval,
                 inputs=[
@@ -208,6 +223,11 @@ def main():
                     metric_explain
                 ]
             )
+            output_response.change(
+                lambda w: gr.update(interactive=True) if w != None else gr.update(),
+                inputs=output_response,
+                outputs=upload_button
+            ) # 测评结束后才可以点击上传按钮进行结果和题目的上传
             upload_button.click(
                 saveSingleEval, 
                 inputs=[
@@ -225,7 +245,7 @@ def main():
                 outputs=[
                     upload_button
                 ]
-            )
+            ) # 上传按钮，点击后上传测评和结果，并且避免二次上传
         with gr.Tab("两模型人工对比"):
             gr.Markdown(
                 '''
@@ -237,8 +257,6 @@ def main():
             with gr.Row():
                 input_model_1 = gr.Dropdown(choices=getModelLabel(), label="模型1", interactive=False)
                 input_model_2 = gr.Dropdown(choices=getModelLabel(), label="模型2", interactive=False)
-                input_model_1.change(changeModelListForMultiEval, inputs=input_model_1, outputs=input_model_2)
-                input_model_2.change(changeModelListForMultiEval, inputs=input_model_2, outputs=input_model_1)
             with gr.Row():
                 input_subject = gr.Radio(choices=getAllSubject(), label="学科", interactive=False)
                 input_knowledge_node = gr.CheckboxGroup([], label="请选择该题所涉及知识点", interactive=False)
@@ -255,6 +273,8 @@ def main():
                 output_response_2 = gr.Textbox(label="模型 2 回答", interactive=False)
             with gr.Row():
                 do_button = gr.Button("模型对比测评", interactive=False)
+                input_model_1.change(changeModelListForMultiEval, inputs=input_model_1, outputs=[input_model_2, do_button])
+                input_model_2.change(changeModelListForMultiEval, inputs=input_model_2, outputs=[input_model_1, do_button])
             with gr.Row():
                 user_opinion = gr.Radio(["模型1更好", "模型2更好", "平手","都很差"], label="请给出你的评价", interactive=False)
                 submit_button = gr.Button("提交", interactive=False)
@@ -268,7 +288,6 @@ def main():
                     input_user_info
                 ],
                 outputs=[
-                    do_button,
                     clear_button, 
                     user_opinion, 
                     input_model_1, 
